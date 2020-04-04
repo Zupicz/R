@@ -155,13 +155,14 @@ Evaluate <- function(dframe=Board) {
   }
   
   # finally, save the 'min_string', correct singular or plural words and the text to be printed into a new character variable
-  Line2 <- paste(min_string, verb_min, "the most scarce resource with only", min(prod_mat), "production points.")
+  Line2 <- paste(min_string, verb_min, "the most scarce", noun_min,"with only", min(prod_mat), "production points.")
   Line3 <- "Keep an eye on those!"
   
   cat(paste(Line1, Line2, Line3, sep = "\n"))
 }
 
 ### FindSpots()
+# this function finds the best initial placements on the gameboard
 FindSpots <- function(dframe=Board, players=4) {
   vertices <- c("ABE", "BCF", "DEI", "EFJ", "FGK", "HIM", "IJN", "JKO", "KLP", "DIH", "GKL", "MNQ", "NOR", "OPS", "NQR", "ORS", "MIN", "JNO", "OKP", "EIJ", "FJK", "ADE", "BEF", "CFG")
   numbers <- vector("character", length(vertices))
@@ -171,6 +172,7 @@ FindSpots <- function(dframe=Board, players=4) {
   
   spots <- data.frame(vertices, numbers, resources, points, has_ore, stringsAsFactors=FALSE)
   
+  # fill the columns in 'spots', take data from 'dframe' (Board)
   for (n in 1:length(vertices)) {
     lttrs <- unlist(strsplit(vertices[n], ""))
     
@@ -191,6 +193,75 @@ FindSpots <- function(dframe=Board, players=4) {
   m.spots <- head(spots[order(spots$points, spots$has_ore, decreasing = T),], players*2)
   best_vertices <- m.spots[,2:4]
   
-  cat("The best starting places for your villages are:", "\n")
+  cat("The best initial placements for your villages are:", "\n")
   print(best_vertices, row.names = F)
+}
+
+### FindComplement()
+# this function finds a suitable initial placement for player's second village based on the resources they covered with their first
+# it finds such a location that complements all the 5 resources if you they to employ 'the generalist' strategy
+FindComplement <- function(dframe=Board, arg1, arg2, arg3) {
+  Categories <- c("Wheat", "Sheep", "Wood", "Brick", "Ore")
+  
+  #find what resources does player still need
+  first_resources <- c(arg1, arg2, arg3)
+  second_resources <- setdiff(Categories, first_resources)
+  
+  # create a dataframe of vertices, same as in FindSpots() minus the 'has_ore' column
+  vertices <- c("ABE", "BCF", "DEI", "EFJ", "FGK", "HIM", "IJN", "JKO", "KLP", "DIH", "GKL", "MNQ", "NOR", "OPS", "NQR", "ORS", "MIN", "JNO", "OKP", "EIJ", "FJK", "ADE", "BEF", "CFG")
+  numbers <- vector("character", length(vertices))
+  resources <- vector("character", length(vertices))
+  points <- vector("numeric", length(vertices))
+  
+  second_placement <- data.frame(vertices, numbers, resources, points, stringsAsFactors=FALSE)
+  
+  # fill the columns in 'second_placement', take data from 'dframe' (Board)
+  for (n in 1:length(vertices)) {
+    lttrs <- unlist(strsplit(vertices[n], ""))
+    
+    row_no <- vector("numeric", length(lttrs))
+    for (i in 1:length(lttrs)) {
+      row_no[i] <- which(dframe$Tile_ID == lttrs[i])
+    }
+    
+    second_placement$numbers[n] <- paste(dframe$Numbers[row_no[1]], dframe$Numbers[row_no[2]], dframe$Numbers[row_no[3]], sep = "-")
+    second_placement$resources[n] <- paste(dframe$Resources[row_no[1]], dframe$Resources[row_no[2]], dframe$Resources[row_no[3]], sep = "-")
+    second_placement$points[n] <- sum(dframe$Points[row_no[1]], dframe$Points[row_no[2]], dframe$Points[row_no[3]])
+  }
+  
+  # get the resource triads of vertices from the dataframe
+  # convert them from strings back to character vectors which are saved in a list
+  three_resources <- vector("list", length(second_placement$resources))
+  for (i in 1:length(second_placement$resources)) {
+    three_resources[i] <- strsplit(second_placement$resources[i], "-")
+  }
+  
+  # find the numbers of rows in the 'second_placement' dataframe which contain the suitable vertices
+  address <- vector("numeric")
+  for (i in 1:length(three_resources)) {
+    if (sum(second_resources %in% unlist(three_resources[i])) == length(second_resources)) {
+      address[i] <- i
+    }
+  }
+  true_address <- as.numeric(na.omit(address))
+  
+  # construct a new dataframe which contains only the suitable vertices
+  new_numbers <- vector("character", length(true_address))
+  new_resources <- vector("character", length(true_address))
+  new_points <- vector("numeric", length(true_address))
+  for (i in 1:length(true_address)) {
+    new_numbers[i] <- second_placement$numbers[true_address[i]]
+    new_resources[i] <- second_placement$resources[true_address[i]]
+    new_points[i] <- second_placement$points[true_address[i]]
+  }
+  new_second_placement <- data.frame(new_numbers, new_resources, new_points)
+  new_second_placement <- new_second_placement[order(new_second_placement$new_points, decreasing = T),]
+  names(new_second_placement) <- NULL
+  
+  if (length(address) == 0) {
+    print("Sorry! I could not find any placements that would give you all 5 resources.")
+  } else {
+    cat("Here are the spots that would give you all 5 resources:", "\n")
+    print(new_second_placement, row.names = F, colnames = F)
+  }
 }
