@@ -2,10 +2,8 @@
 # this function creates a random game board in form of a dataframe
 CreateRandom <- function() {
   
-  ## declare the total number of tiles in the game
+  # declare the total number of tiles in the game and generate IDs for individual tiles
   Tile_No <- 19
-  
-  ## generate IDs for individual tiles
   Tile_ID <- c(LETTERS[1:Tile_No])
   
   ## generate a vector of randomized resources
@@ -44,6 +42,58 @@ CreateRandom <- function() {
       }
     }
   }
+  
+  # create a new vector 'Points' which holds the production points of the corresponding tiles
+  # Production Points are corresponding to the number of possibilities that this particular number lands after throwing two dice
+  Points <- vector("numeric", 19)
+  for (i in 1:length(Numbers)) {
+    Points[i] <- (6-abs(Numbers[i]-7))
+  }
+  Points[which(Points == -1)] <- 0
+  
+  Board <- data.frame(Tile_ID, Resources, Numbers, Points)
+  return(Board)
+}
+
+### CreateBoard()
+# this function creates a board based on user input
+CreateBoard <- function(resources_input, numbers_input) {
+  
+  #check the user input
+  if (is.numeric(resources_input) == F | is.numeric(numbers_input) == F) {
+    print("Sorry! Your input must have a form of a numeric vector.")
+  }
+  
+  if (length(resources_input) != 19) {
+    print("Sorry! You must type in exactly 19 values representing resources on your gameboard.")
+  }
+  
+  if (length(numbers_input) != 19) {
+    print("Sorry! You must type in exactly 19 values representing numbers on the tiles of your gameboard.")
+  }
+  
+  if (any(numbers_input > 12)) {
+    print("Numbers on the tiles of your gameboard must range from 2 to 12.")
+  }
+  
+  # declare the total number of tiles in the game and generate IDs for individual tiles
+  Tile_No <- 19
+  Tile_ID <- c(LETTERS[1:Tile_No])
+  
+  # convert numbers from the numeric vector 'resources_input' into resource names and save them in a character vector
+  Resources <- vector("character", Tile_No)
+  reference_numbers <- c(0:5)
+  reference_resources <- c("Desert", "Wood", "Sheep", "Wheat", "Brick", "Ore")
+  
+  for (i in 1:length(resources_input)) {
+    for (n in 1:length(reference_numbers)) {
+      if (resources_input[i] == reference_numbers[n]) {
+        Resources[i] <- reference_resources[n]
+      }
+    }
+  }
+  
+  Numbers <- numbers_input
   
   # create a new vector 'Points' which holds the production points of the corresponding tiles
   # Production Points are corresponding to the number of possibilities that this particular number lands after throwing two dice
@@ -163,7 +213,7 @@ Evaluate <- function(dframe=Board) {
 
 ### FindSpots()
 # this function finds the best initial placements on the gameboard
-FindSpots <- function(dframe=Board, players=4) {
+FindSpots <- function(dframe=Board) {
   vertices <- c("ABE", "BCF", "DEI", "EFJ", "FGK", "HIM", "IJN", "JKO", "KLP", "DIH", "GKL", "MNQ", "NOR", "OPS", "NQR", "ORS", "MIN", "JNO", "OKP", "EIJ", "FJK", "ADE", "BEF", "CFG")
   numbers <- vector("character", length(vertices))
   resources <- vector("character", length(vertices))
@@ -190,8 +240,9 @@ FindSpots <- function(dframe=Board, players=4) {
     }
   }
   
-  m.spots <- head(spots[order(spots$points, spots$has_ore, decreasing = T),], players*2)
+  m.spots <- head(spots[order(spots$points, spots$has_ore, decreasing = T),], length(which(spots$points >= 10)))
   best_vertices <- m.spots[,2:4]
+  names(best_vertices) <- c("Numbers", "Resources", "Points")
   
   cat("The best initial placements for your villages are:", "\n")
   print(best_vertices, row.names = F)
@@ -200,7 +251,7 @@ FindSpots <- function(dframe=Board, players=4) {
 ### FindComplement()
 # this function finds a suitable initial placement for player's second village based on the resources they covered with their first
 # it finds such a location that complements all the 5 resources if you they to employ 'the generalist' strategy
-FindComplement <- function(dframe=Board, arg1, arg2, arg3) {
+FindComplement <- function(arg1, arg2, arg3, dframe=Board) {
   Categories <- c("Wheat", "Sheep", "Wood", "Brick", "Ore")
   
   #find what resources does player still need
@@ -256,7 +307,7 @@ FindComplement <- function(dframe=Board, arg1, arg2, arg3) {
   }
   new_second_placement <- data.frame(new_numbers, new_resources, new_points)
   new_second_placement <- new_second_placement[order(new_second_placement$new_points, decreasing = T),]
-  names(new_second_placement) <- NULL
+  names(new_second_placement) <- c("Numbers", "Resources", "Points")
   
   if (length(address) == 0) {
     print("Sorry! I could not find any placements that would give you all 5 resources.")
